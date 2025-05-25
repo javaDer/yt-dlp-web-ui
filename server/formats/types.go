@@ -2,13 +2,21 @@ package formats
 
 // Used to deser the formats in the -J output
 type Metadata struct {
-	Type      string     `json:"_type"`
-	Formats   []Format   `json:"formats"`
-	Best      Format     `json:"best"`
-	Thumbnail string     `json:"thumbnail"`
-	Title     string     `json:"title"`
-	URL       string     `json:"url"`
-	Entries   []Metadata `json:"entries"` // populated if url is playlist
+	Type      string                      `json:"_type"`
+	Formats   []Format                    `json:"formats"`
+	Best      Format                      `json:"best"`
+	Thumbnail string                      `json:"thumbnail"`
+	Title     string                      `json:"title"`
+	URL       string                      `json:"url"`
+	Entries   []Metadata                  `json:"entries"` // populated if url is playlist
+	Subtitles map[string][]SubtitleFormat `json:"subtitles"`
+}
+
+// SubtitleFormat represents a single subtitle format
+type SubtitleFormat struct {
+	Ext  string `json:"ext"`
+	URL  string `json:"url"`
+	Name string `json:"name"`
 }
 
 func (m *Metadata) IsPlaylist() bool {

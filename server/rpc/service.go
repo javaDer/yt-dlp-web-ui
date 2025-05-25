@@ -32,6 +32,7 @@ func (s *Service) Exec(args internal.DownloadRequest, result *string) error {
 			Path:     args.Path,
 			Filename: args.Rename,
 		},
+		SubtitleLangs: args.SubtitleLangs, // Pass subtitle languages
 	}
 
 	s.db.Set(p)
@@ -108,8 +109,27 @@ func (s *Service) Formats(args internal.DownloadRequest, meta *formats.Metadata)
 	if metadata.IsPlaylist() {
 		go internal.PlaylistDetect(args, s.mq, s.db)
 	}
+	// If there are subtitles, add them to the metadata
+	if metadata.Subtitles != nil && len(metadata.Subtitles) > 0 {
+		meta.Subtitles = metadata.Subtitles
+	}
 
 	*meta = *metadata
+	return nil
+}
+
+// GetSubtitles retrieves available subtitles for a given resource.
+func (s *Service) GetSubtitles(args internal.DownloadRequest, subtitles *map[string][]formats.SubtitleFormat) error {
+	metadata, err := formats.ParseURL(args.URL)
+	if err != nil {
+		return err
+	}
+
+	if metadata.Subtitles != nil {
+		*subtitles = metadata.Subtitles
+	} else {
+		*subtitles = make(map[string][]formats.SubtitleFormat) // Return empty map if no subtitles
+	}
 	return nil
 }
 

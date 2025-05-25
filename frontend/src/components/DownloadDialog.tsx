@@ -78,6 +78,10 @@ const DownloadDialog: FC<Props> = ({ open, onClose, onDownloadStart }) => {
   const [pickedAudioFormat, setPickedAudioFormat] = useState('')
   const [pickedBestFormat, setPickedBestFormat] = useState('')
   const [isFormatsLoading, setIsFormatsLoading] = useState(false)
+  const [hasSubtitles, setHasSubtitles] = useState(false)
+  const [selectedSubtitleLangs, setSelectedSubtitleLangs] = useState<string[]>([])
+  const [availableSubtitleLangs, setAvailableSubtitleLangs] = useState<string[]>([])
+  const [selectedSubtitleFormats, setSelectedSubtitleFormats] = useState<Record<string, string>>({}) // New state for selected formats per language
 
   const [downloadPath, setDownloadPath] = useState('')
 
@@ -115,12 +119,32 @@ const DownloadDialog: FC<Props> = ({ open, onClose, onDownloadStart }) => {
         .trim()
 
       await new Promise(r => setTimeout(r, 10))
+      let finalArgs = `${toFormatArgs(codes)} ${downloadTemplate}`
+
+      // Add subtitle arguments if subtitleLangs is provided
+      if (selectedSubtitleLangs.length > 0) {
+        finalArgs += ` --write-subs`
+        // Add specific subtitle languages
+        finalArgs += ` --sub-langs ${selectedSubtitleLangs.join(',')}`
+        // Add specific subtitle formats if selected
+        // Add specific subtitle formats if selected (applies to all selected languages)
+        const selectedFormats = Object.values(selectedSubtitleFormats).filter(Boolean)
+        if (selectedFormats.length > 0) {
+          // Use the first selected format as the preferred format for all
+          finalArgs += ` --sub-format ${selectedFormats[0]}`
+        }
+      } else if (hasSubtitles && selectedSubtitleLangs.length === 0) {
+        // If hasSubtitles is true and no specific language is selected, download all subtitles
+        finalArgs += ` --write-subs --all-subs`
+      }
+
       client.download({
         url: immediate || line,
-        args: `${toFormatArgs(codes)} ${downloadTemplate}`,
+        args: finalArgs,
         pathOverride: downloadPath ?? '',
         renameTo: settings.fileRenaming ? filenameTemplate + (settings.autoFileExtension ? fileExtension : '') : '',
         playlist: isPlaylist,
+        subtitleLangs: hasSubtitles ? selectedSubtitleLangs : undefined, // Pass subtitle languages to backend
       })
 
       setTimeout(() => {
@@ -161,6 +185,17 @@ const DownloadDialog: FC<Props> = ({ open, onClose, onDownloadStart }) => {
         }
         setDownloadFormats(formats.result)
         resetInput()
+
+        // Check for subtitles
+        if (formats.result.subtitles && Object.keys(formats.result.subtitles).length > 0) {
+          setHasSubtitles(true)
+          setAvailableSubtitleLangs(Object.keys(formats.result.subtitles))
+          pushMessage('视频有可用字幕。', 'info')
+        } else {
+          setHasSubtitles(false)
+          setAvailableSubtitleLangs([])
+          pushMessage('视频没有可用字幕。', 'info')
+        }
       })
       .then(() => setIsFormatsLoading(false))
   }
@@ -379,6 +414,95 @@ const DownloadDialog: FC<Props> = ({ open, onClose, onDownloadStart }) => {
               </Paper>
             </Grid>
           </Grid >
+          {/* Subtitle Selection */}
+          {hasSubtitles && (
+            <Paper
+              elevation={4}
+              sx={{
+                p: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                mt: 2,
+              }}
+            >
+              <Typography variant="h6" gutterBottom>
+                字幕选项
+              </Typography>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={selectedSubtitleLangs.length > 0 || (hasSubtitles && availableSubtitleLangs.length === 0)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        // If checked, and there are available languages, select all by default
+                        if (availableSubtitleLangs.length > 0) {
+                          setSelectedSubtitleLangs(availableSubtitleLangs)
+                        } else {
+                          // If no specific languages are available, but hasSubtitles is true,
+                          // it implies downloading all available (e.g., auto-generated)
+                          setSelectedSubtitleLangs([])
+                        }
+                      } else {
+                        setSelectedSubtitleLangs([])
+                      }
+                    }}
+                  />
+                }
+                label="下载字幕"
+              />
+              {availableSubtitleLangs.length > 0 && (
+                <FormControl fullWidth sx={{ mt: 1 }}>
+                  <Autocomplete
+                    multiple
+                    options={availableSubtitleLangs}
+                    getOptionLabel={(option) => option}
+                    value={selectedSubtitleLangs}
+                    onChange={(_, newValue) => {
+                      setSelectedSubtitleLangs(newValue)
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        variant="outlined"
+                        label="选择字幕语言"
+                        placeholder="语言"
+                      />
+                    )}
+                  />
+                </FormControl>
+              )}
+              {hasSubtitles && availableSubtitleLangs.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  {availableSubtitleLangs.map((lang) => (
+                    <FormControl fullWidth key={lang} sx={{ mt: 1 }}>
+                      <Typography variant="subtitle2">{lang}</Typography>
+                      <Select
+                        value={selectedSubtitleFormats[lang] || ''}
+                        onChange={(e) => {
+                          setSelectedSubtitleFormats((prev) => ({
+                            ...prev,
+                            [lang]: e.target.value,
+                          }))
+                        }}
+                        displayEmpty
+                        inputProps={{ 'aria-label': 'Without label' }}
+                      >
+                        <MenuItem value="">
+                          <em>自动选择最佳格式</em>
+                        </MenuItem>
+                        {downloadFormats?.subtitles?.[lang]?.map((subFormat) => (
+                          <MenuItem key={subFormat.ext} value={subFormat.ext}>
+                            {subFormat.ext}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  ))}
+                </Box>
+              )}
+            </Paper>
+          )}
+
           {/* Format Selection grid */}
           {downloadFormats && <FormatsGrid
             downloadFormats={downloadFormats}

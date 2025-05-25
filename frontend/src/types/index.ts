@@ -75,6 +75,13 @@ export type DLMetadata = {
   thumbnail: string
   title: string
   entries: Array<DLMetadata>
+  subtitles?: { [key: string]: SubtitleFormat[] }
+}
+
+export interface SubtitleFormat {
+  ext: string
+  url: string
+  name: string
 }
 
 export type DLFormat = {

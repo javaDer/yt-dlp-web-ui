@@ -46,15 +46,16 @@ const (
 
 // Process descriptor
 type Process struct {
-	Id         string
-	Url        string
-	Livestream bool
-	AutoRemove bool
-	Params     []string
-	Info       common.DownloadInfo
-	Progress   DownloadProgress
-	Output     DownloadOutput
-	proc       *os.Process
+	Id            string
+	Url           string
+	Livestream    bool
+	AutoRemove    bool
+	Params        []string
+	Info          common.DownloadInfo
+	Progress      DownloadProgress
+	Output        DownloadOutput
+	SubtitleLangs []string // New field for subtitle languages
+	proc          *os.Process
 }
 
 // Starts spawns/forks a new yt-dlp process and parse its stdout.
@@ -106,6 +107,16 @@ func (p *Process) Start() {
 	if !(slices.Contains(p.Params, "-P") || slices.Contains(p.Params, "--paths")) {
 		p.Params = append(p.Params, "-o")
 		p.Params = append(p.Params, fmt.Sprintf("%s/%s", out.Path, out.Filename))
+	}
+
+	// Add subtitle arguments if subtitleLangs is provided
+	if p.SubtitleLangs != nil && len(p.SubtitleLangs) > 0 {
+		p.Params = append(p.Params, "--write-subs")
+		p.Params = append(p.Params, "--sub-langs", strings.Join(p.SubtitleLangs, ","))
+	} else if p.SubtitleLangs != nil && len(p.SubtitleLangs) == 0 {
+		// If an empty array is passed, it means "all subtitles"
+		p.Params = append(p.Params, "--write-subs")
+		p.Params = append(p.Params, "--all-subs")
 	}
 
 	params := append(baseParams, p.Params...)

@@ -8,7 +8,8 @@ type DownloadRequestArgs = {
   args: string,
   pathOverride?: string,
   renameTo?: string,
-  playlist?: boolean
+  playlist?: boolean,
+  subtitleLangs?: string[] // New field for subtitle languages
 }
 
 export class RPCClient {
@@ -107,6 +108,7 @@ export class RPCClient {
         Params: sanitizedArgs,
         Path: req.pathOverride,
         Rename: req.renameTo || rename,
+        SubtitleLangs: req.subtitleLangs, // Pass subtitle languages to backend
       }]
     })
   }
